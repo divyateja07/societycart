@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: societycart
+      POSTGRES_USER: societycart
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U societycart -d societycart"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/societycart
+      DATABASE_USER: societycart
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-simulated}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports: ["127.0.0.1:8080:8080"]
+    healthcheck:
+      test: ["CMD", "/bin/bash", "/app/healthcheck.sh"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 20s
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend: { condition: service_healthy }
+    ports: ["127.0.0.1:5173:80"]
+volumes:
+  postgres_data:
